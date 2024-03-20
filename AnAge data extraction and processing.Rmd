@@ -1,0 +1,283 @@
+---
+title: "AnAge mammalian lifespan extraction"
+author: "Alexander Tchernev"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Packages
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+
+# Mammalian longevity
+
+## Load AnAge
+```{r}
+AnAge = read.delim("D:/Birmingham/Away Mini Project/AnAge/anage_data.txt")
+```
+
+
+## Extract mammals
+```{r}
+mammals = AnAge[AnAge$Class == "Mammalia", ]
+```
+
+
+## Remove species for which longevity data is not available
+```{r}
+mammalian_longevity = mammals[!is.na(mammals$Maximum.longevity..yrs.), ]
+```
+
+
+## Merge the genus and species columns into a new column and then remove all columns except for the newly merged column, the longevity column, the adult body mass column, the sample size column, and the data quality column
+```{r}
+# Merge columns
+genus_and_species = paste0(mammalian_longevity$Genus, "_", mammalian_longevity$Species)
+
+# Add longevity data
+longevity = data.frame(Species = genus_and_species, 
+							  Max_longevity = mammalian_longevity$Maximum.longevity..yrs., 
+							  Adult_body_mass = mammalian_longevity$Adult.weight..g., 
+							  Sample_size = mammalian_longevity$Sample.size, 
+							  Data_quality = mammalian_longevity$Data.quality)
+```
+
+
+## Save the longevity dataframe as a tab-delimited file
+```{r}
+write.table(longevity, "D:/Birmingham/Away Mini Project/AnAge/longevity.txt", sep = "\t", dec = ".", row.names = F, col.names = F, quote = F)
+```
+
+
+## Save the species names
+```{r}
+write.table(genus_and_species, "D:/Birmingham/Away Mini Project/AnAge/names.txt", sep = "\t", dec = ".", row.names = F, col.names = F, quote = F)
+```
+
+
+
+# Primates longevity
+
+## Extract only primates with longevity data
+```{r}
+primates_longevity = mammalian_longevity[mammalian_longevity$Order == "Primates", ]
+```
+
+
+## Merge the genus and species columns into a new column and then remove all columns except for the newly merged column, the longevity column, the sample size column, and the data quality column
+```{r}
+# Merge columns
+genus_and_species = paste0(primates_longevity$Genus, "_", primates_longevity$Species)
+
+# Add longevity data
+primates_longevity = data.frame(Species = genus_and_species, 
+										  Max_longevity = primates_longevity$Maximum.longevity..yrs., 
+										  Adult_body_mass = primates_longevity$Adult.weight..g., 
+										  Sample_size = primates_longevity$Sample.size, 
+										  Data_quality = primates_longevity$Data.quality)
+```
+
+
+
+# RefSeq primates
+
+## Filter the primates for which a RefSeq genome was found when running the perl script
+```{r}
+# Define a vector of the primates with genomes in RefSeq
+refseq_primates = c("Homo_sapiens", "Hylobates_moloch", "Lemur_catta", "Macaca_fascicularis", 
+						  "Macaca_mulatta", "Macaca_nemestrina", "Mandrillus_leucophaeus", 
+						  "Microcebus_murinus", "Nomascus_leucogenys", "Nycticebus_coucang", 
+						  "Otolemur_garnettii", "Pan_paniscus", "Pongo_pygmaeus", 
+						  "Rhinopithecus_roxellana", "Sapajus_apella", "Symphalangus_syndactylus", 
+						  "Theropithecus_gelada", "Trachypithecus_francoisi")
+
+# Extract the records for those primates from the table for all primates
+refseq_primates_long = filter(primates_longevity, primates_longevity$Species %in% refseq_primates)
+
+# Add a column that states that all the species belong to primates (this has to be present to satisfy the grouping requirement of CALANGO) and a column with a normalization value of 1 for each species (this also has to be present to satisfy the normalization requirement of CALANGO)
+refseq_primates_long = mutate(refseq_primates_long, Group = "primates", Norm = 1)
+
+# Save the table
+write.table(refseq_primates_long, "D:/Birmingham/Away Mini Project/AnAge/primates_metadata.txt", sep = "\t", dec = ".", row.names = F, col.names = F, quote = F)
+```
+
+
+
+# Save a data frame version where the longevity values are ln-transformed
+```{r}
+# Create a copy of the data frame
+ln_refseq_primates_long = refseq_primates_long
+
+# Ln-transform the longevity values
+ln_refseq_primates_long$Max_longevity = log(ln_refseq_primates_long$Max_longevity)
+
+# Save the data frame
+write.table(ln_refseq_primates_long, "D:/Birmingham/Away Mini Project/AnAge/ln_primates_metadata.txt", sep = "\t", dec = ".", row.names = F, col.names = F, quote = F)
+
+# Have a look at the normal Q-Q plot to judge normality of lifespan distribution
+qqnorm(ln_refseq_primates_long$Max_longevity)
+qqline(ln_refseq_primates_long$Max_longevity)
+```
+
+
+<!-- ## Save table version where the longevity values are log-transformed -->
+<!-- ```{r} -->
+<!-- lg_refseq_primates_long = refseq_primates_long -->
+
+<!-- lg_refseq_primates_long$Max_longevity = log10(lg_refseq_primates_long$Max_longevity) -->
+
+<!-- write.table(lg_refseq_primates_long, "D:/Birmingham/Away Mini Project/AnAge/lg_primates_metadata.txt", sep = "\t", dec = ".", row.names = F, col.names = F, quote = F) -->
+
+<!-- # Have a look at the normal Q-Q plot to judge normality of lifespan distribution -->
+<!-- qqnorm(lg_refseq_primates_long$Max_longevity) -->
+<!-- qqline(lg_refseq_primates_long$Max_longevity) -->
+<!-- ``` -->
+
+
+
+# Plot max longevity values - raw and transformed - to see distribution
+```{r}
+# Longevity - not transformed
+ggplot(refseq_primates_long, aes(x = Max_longevity)) +
+	geom_histogram(aes(y = ..density..), binwidth = 4, fill = "blue", color = "black") +
+	geom_density(alpha = 0.4, fill = "darkorange") +
+	labs(title = "Histogram with Density", x = "Max longevity - years", y = "Density") +
+	theme(axis.title = element_text(size = 14), 
+			axis.title.y = element_text(margin = margin(r = 10)), 
+			plot.title = element_text(hjust = 0.5, size = 16))
+
+# Longevity - natural log transformed
+ggplot(refseq_primates_long, aes(x = log(Max_longevity))) +
+	geom_histogram(aes(y = ..density..), binwidth = 0.07, fill = "blue", color = "black") +
+	geom_density(alpha = 0.4, fill = "darkorange") +
+	labs(title = "Histogram with Density", x = "Max longevity - ln(years)", y = "Density") +
+	theme(axis.title = element_text(size = 14), 
+			axis.title.y = element_text(margin = margin(r = 10)), 
+			plot.title = element_text(hjust = 0.5, size = 16))
+
+# Longevity - log10 transformed
+ggplot(refseq_primates_long, aes(x = log10(Max_longevity))) +
+	geom_histogram(aes(y = ..density..), binwidth = 0.03, fill = "blue", color = "black") +
+	geom_density(alpha = 0.4, fill = "darkorange") +
+	labs(title = "Histogram with Density", x = "Max longevity - lg(years)", y = "Density") +
+	theme(axis.title = element_text(size = 14), 
+			axis.title.y = element_text(margin = margin(r = 10)), 
+			plot.title = element_text(hjust = 0.5, size = 16))
+```
+
+
+
+# Add two columns to the data frame that contain the ln-transformed longevity and adult body mass values
+```{r}
+refseq_primates_long = refseq_primates_long |> mutate(ln_Max_longevity = log(Max_longevity), ln_Adult_body_mass = log(Adult_body_mass))
+```
+
+
+
+# With humans
+
+## Linear regression and residuals extraction
+
+### Plot the ln-transformed longevity values against the ln-transformed adult body mass values
+```{r}
+ggplot(refseq_primates_long, aes(x = ln_Adult_body_mass, y = ln_Max_longevity)) +
+	geom_point() +
+	geom_smooth(method = "lm") +
+	labs(title = "Ln-transformed values", x = "Adult Body Mass", y = "Max Longevity") +
+	theme(axis.title = element_text(size = 14), 
+			axis.title.y = element_text(margin = margin(r = 10)), 
+			plot.title = element_text(hjust = 0.5, size = 16))
+```
+
+
+### Linear regression
+```{r}
+# Model
+Mass_vs_Long = lm(refseq_primates_long$ln_Max_longevity ~ refseq_primates_long$ln_Adult_body_mass)
+
+# Anova table
+anova(Mass_vs_Long)
+
+# Model summary
+summary(Mass_vs_Long)
+```
+
+
+### Residuals extraction
+```{r}
+# Residuals
+resid = Mass_vs_Long$residuals
+
+# Residuals distribution
+hist(resid)
+
+# Add column containing residuals from ln-adult body mass vs ln-max longevity to data frame that will be used as metadata file
+Homo_resid_refseq_primates_long = mutate(refseq_primates_long, Resid = resid)
+
+# Reorder the columns
+Homo_resid_refseq_primates_long = Homo_resid_refseq_primates_long[, c(1, 10, 6, 7, 2, 8, 3, 9, 4, 5)]
+
+# Save the data frame
+write.table(Homo_resid_refseq_primates_long, 
+				"D:/Birmingham/Away Mini Project/AnAge/Homo_resid_ln_primates_metadata.txt", 
+				sep = "\t", dec = ".", row.names = F, col.names = F, quote = F)
+```
+
+
+# Without humans
+
+## Remove humans because they are outliers
+```{r}
+no_Homo_refseq_primates_long = filter(refseq_primates_long, Species != "Homo_sapiens")
+```
+
+## Linear regression and residuals extraction
+
+### Plot the ln-transformed longevity values against the ln-transformed adult body mass values
+```{r}
+ggplot(no_Homo_refseq_primates_long, aes(x = ln_Adult_body_mass, y = ln_Max_longevity)) +
+	geom_point() +
+	geom_smooth(method = "lm") +
+	labs(title = "Ln-transformed values", x = "Adult Body Mass", y = "Max Longevity") +
+	theme(axis.title = element_text(size = 14), 
+			axis.title.y = element_text(margin = margin(r = 10)), 
+			plot.title = element_text(hjust = 0.5, size = 16))
+```
+
+
+
+### Linear regression
+```{r}
+# Model
+no_Homo_Mass_vs_Long = lm(no_Homo_refseq_primates_long$ln_Max_longevity ~ no_Homo_refseq_primates_long$ln_Adult_body_mass)
+
+# Anova table
+anova(no_Homo_Mass_vs_Long)
+
+# Model summary
+summary(no_Homo_Mass_vs_Long)
+```
+
+
+### Residuals extraction
+```{r}
+# Residuals
+no_Homo_resid = no_Homo_Mass_vs_Long$residuals
+
+# Residuals distribution
+hist(no_Homo_resid)
+
+# Add column containing residuals from ln-adult body mass vs ln-max longevity to data frame that will be used as metadata file
+no_Homo_resid_refseq_primates_long = mutate(no_Homo_refseq_primates_long, Resid = no_Homo_resid)
+
+# Reorder the columns
+no_Homo_resid_refseq_primates_long = no_Homo_resid_refseq_primates_long[, c(1, 10, 6, 7, 2, 8, 3, 9, 4, 5)]
+
+# Save the data frame
+write.table(no_Homo_resid_refseq_primates_long, 
+				"D:/Birmingham/Away Mini Project/AnAge/no_Homo_resid_ln_primates_metadata.txt", 
+				sep = "\t", dec = ".", row.names = F, col.names = F, quote = F)
+```
