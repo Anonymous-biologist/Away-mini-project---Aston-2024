@@ -1,0 +1,108 @@
+---
+title: "Run"
+author: "Alexander Tchernev"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+# Load necessary packages
+```{r}
+library(CALANGO)
+library(ape)
+library(phytools)
+```
+
+
+# Set working directory
+```{r}
+setwd("D:/Birmingham/Away Mini Project/CALANGO/Run")
+```
+
+
+# Convert phylogenetic trees to ultrametric as they are not recognised as such due to rounding errors
+```{r}
+# Tree for all 18 primates (incl. humans)
+
+# Load tree
+primate_tree = read.tree("./inputs/tree/primate_tree.nwk")
+
+# Check if it is ultrametric
+is.ultrametric(primate_tree)
+
+# Convert to ultrametric
+primate_tree = force.ultrametric(primate_tree, method = "extend")
+
+# Check that conversion has been successful
+is.ultrametric(primate_tree)
+
+# Save tree
+write.tree(primate_tree, file = "./inputs/tree/primate_tree.nwk")
+
+
+
+# Tree for 17 primates (excl. humans)
+
+# Load tree
+no_Homo_primate_tree = read.tree("./inputs/tree/no_Homo_primate_tree.nwk")
+
+# Check if it is ultrametric
+is.ultrametric(no_Homo_primate_tree)
+
+# Convert to ultrametric
+no_Homo_primate_tree = force.ultrametric(no_Homo_primate_tree, method = "extend")
+
+# Check that conversion has been successful
+is.ultrametric(no_Homo_primate_tree)
+
+# Save tree
+write.tree(no_Homo_primate_tree, file = "./inputs/tree/no_Homo_primate_tree.nwk")
+```
+
+
+# With cutoffs
+
+## Ln-transformed longevity values
+```{r}
+ln_output = run_CALANGO(defs = "./inputs/parameters/ln_parameters.txt", 
+								basedir = "./", 
+								cores = 4)
+```
+
+
+
+## With humans - using residuals
+```{r}
+Homo_resid_output = run_CALANGO(defs = "./inputs/parameters/Homo_resid_ln_parameters.txt", 
+										  basedir = "./", 
+										  cores = 4)
+```
+
+
+
+## Without humans - using residuals
+```{r}
+no_Homo_resid_output = run_CALANGO(defs = "./inputs/parameters/no_Homo_resid_ln_parameters.txt", 
+											  basedir = "./", 
+											  cores = 4)
+```
+
+
+
+# No cutoffs
+
+## With humans - using residuals
+```{r}
+no_cutoffs_Homo_resid_output = run_CALANGO(defs = "./inputs/parameters/cutoffs_none_Homo_resid_ln_parameters.txt", 
+										  basedir = "./", 
+										  cores = 4)
+```
+
+
+
+## Without humans - using residuals
+```{r}
+no_cutoffs_no_Homo_resid_output = run_CALANGO(defs = "./inputs/parameters/cutoffs_none_no_Homo_resid_ln_parameters.txt", 
+											  basedir = "./", 
+											  cores = 4)
+```
